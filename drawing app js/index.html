@@ -1,0 +1,358 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Creative Drawing Board</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #eef1f8;
+            min-height: 100vh;
+            padding: 25px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #273469;
+            margin-bottom: 25px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 20px #0002;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .toolbar button,
+        .toolbar select {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 7px;
+            background: #e4e9f5;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .toolbar button:hover {
+            background: #cbd5f0;
+        }
+
+        .toolbar button.active {
+            background: #273469;
+            color: white;
+        }
+
+        .toolbar input {
+            cursor: pointer;
+        }
+
+        .option {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 450px;
+            border: 2px solid #273469;
+            border-radius: 10px;
+            background: white;
+            cursor: crosshair;
+            touch-action: none;
+        }
+
+        .bottom {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .clear {
+            background: #e63946 !important;
+            color: white;
+        }
+
+        .clear:hover {
+            background: #c1121f !important;
+        }
+
+        #status {
+            color: #555;
+            margin-top: 12px;
+            font-size: 14px;
+        }
+
+        @media(max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding: 12px;
+            }
+
+            canvas {
+                height: 350px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🎨 Creative Drawing Board</h1>
+
+    <div class="container">
+
+        <div class="toolbar">
+
+            <select id="shape">
+                <option value="free">Free Draw</option>
+                <option value="line">Line</option>
+                <option value="rectangle">Rectangle</option>
+                <option value="circle">Circle</option>
+            </select>
+
+            <div class="option">
+                <label>Color:</label>
+                <input type="color" id="color" value="#273469">
+            </div>
+
+            <div class="option">
+                <label>Width:</label>
+                <input type="range" id="width"
+                    min="1" max="30" value="4">
+                <span id="widthValue">4</span>
+            </div>
+
+            <button id="eraser">Eraser</button>
+
+        </div>
+
+        <canvas id="canvas"></canvas>
+
+        <div class="bottom">
+            <button id="clear" class="clear">
+                Clear Canvas
+            </button>
+
+            <p id="status">Select a shape and start drawing!</p>
+        </div>
+
+    </div>
+
+    <script>
+
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+
+        const shape = document.getElementById("shape");
+        const color = document.getElementById("color");
+        const width = document.getElementById("width");
+        const widthValue = document.getElementById("widthValue");
+        const eraser = document.getElementById("eraser");
+        const clear = document.getElementById("clear");
+        const status = document.getElementById("status");
+
+        let drawing = false;
+        let startX, startY;
+        let snapshot;
+        let currentTool = "free";
+
+        // Set canvas size
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const image = document.createElement("canvas");
+
+            if (canvas.width && canvas.height) {
+                image.width = canvas.width;
+                image.height = canvas.height;
+                image.getContext("2d").drawImage(canvas, 0, 0);
+            }
+
+            const oldWidth = canvas.width;
+            const oldHeight = canvas.height;
+
+            const dpr = window.devicePixelRatio || 1;
+
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+            if (oldWidth && oldHeight) {
+                ctx.drawImage(
+                    image, 0, 0, oldWidth, oldHeight,
+                    0, 0, rect.width, rect.height
+                );
+            }
+        }
+
+        resizeCanvas();
+
+        window.addEventListener("resize", resizeCanvas);
+
+        // Get mouse or touch position
+        function getPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+
+            return {
+                x: e.clientX - rect.left,
+                y: e.clientY - rect.top
+            };
+        }
+
+        // Start drawing
+        canvas.addEventListener("pointerdown", (e) => {
+
+            drawing = true;
+            canvas.setPointerCapture(e.pointerId);
+
+            const pos = getPosition(e);
+
+            startX = pos.x;
+            startY = pos.y;
+
+            snapshot = ctx.getImageData(
+                0, 0, canvas.width, canvas.height
+            );
+
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+
+        });
+
+        // Draw shapes
+        canvas.addEventListener("pointermove", (e) => {
+
+            if (!drawing) return;
+
+            const pos = getPosition(e);
+
+            ctx.putImageData(snapshot, 0, 0);
+
+            ctx.strokeStyle = currentTool === "eraser"
+                ? "white" : color.value;
+
+            ctx.lineWidth = currentTool === "eraser"
+                ? 20 : width.value;
+
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            if (currentTool === "free" ||
+                currentTool === "eraser") {
+
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+
+                startX = pos.x;
+                startY = pos.y;
+
+                snapshot = ctx.getImageData(
+                    0, 0, canvas.width, canvas.height
+                );
+
+                return;
+            }
+
+            if (currentTool === "line") {
+
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+
+            }
+
+            else if (currentTool === "rectangle") {
+
+                ctx.strokeRect(
+                    startX, startY,
+                    pos.x - startX,
+                    pos.y - startY
+                );
+
+            }
+
+            else if (currentTool === "circle") {
+
+                const radius = Math.sqrt(
+                    Math.pow(pos.x - startX, 2) +
+                    Math.pow(pos.y - startY, 2)
+                );
+
+                ctx.beginPath();
+                ctx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                ctx.stroke();
+
+            }
+
+        });
+
+        // Stop drawing
+        function stopDrawing() {
+            drawing = false;
+            ctx.beginPath();
+        }
+
+        canvas.addEventListener("pointerup", stopDrawing);
+        canvas.addEventListener("pointercancel", stopDrawing);
+
+        // Change shape
+        shape.addEventListener("change", () => {
+            currentTool = shape.value;
+            eraser.classList.remove("active");
+            status.textContent = "Selected: " + currentTool;
+        });
+
+        // Change brush width
+        width.addEventListener("input", () => {
+            widthValue.textContent = width.value;
+        });
+
+        // Eraser option
+        eraser.addEventListener("click", () => {
+            currentTool = "eraser";
+            shape.value = "free";
+            eraser.classList.add("active");
+            status.textContent = "Eraser selected";
+        });
+
+        // Clear canvas
+        clear.addEventListener("click", () => {
+            ctx.clearRect(
+                0, 0, canvas.width, canvas.height
+            );
+
+            status.textContent = "Canvas cleared!";
+        });
+
+    </script>
+
+</body>
+</html>
